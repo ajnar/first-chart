@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SACCO Revenue 2026</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6.16/dist/plot.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --ink: #1a1a1a;
+    --ink-muted: #666666;
+    --rule: #d9d9d9;
+    --ac: #404040;       /* actual: dark grey solid */
+    --py: #c4c4c4;       /* prior year: light grey */
+    --bu-stroke: #404040; /* budget: outlined */
+    --bu-fill: #ffffff;
+    --pos: #2e8540;
+    --neg: #c62828;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161616;
+      --ink: #ececec;
+      --ink-muted: #a0a0a0;
+      --rule: #3a3a3a;
+      --ac: #d4d4d4;
+      --py: #5c5c5c;
+      --bu-stroke: #d4d4d4;
+      --bu-fill: #161616;
+      --pos: #5cbf6e;
+      --neg: #ef6b63;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161616;
+    --ink: #ececec;
+    --ink-muted: #a0a0a0;
+    --rule: #3a3a3a;
+    --ac: #d4d4d4;
+    --py: #5c5c5c;
+    --bu-stroke: #d4d4d4;
+    --bu-fill: #161616;
+    --pos: #5cbf6e;
+    --neg: #ef6b63;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 1.35rem; line-height: 1.3; margin: 0 0 4px; font-weight: 650; }
+  .subtitle { color: var(--ink-muted); margin: 0 0 20px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 8px; color: var(--ink-muted); font-size: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 12px; height: 12px; display: inline-block; }
+  .sw.ac { background: var(--ac); }
+  .sw.py { background: var(--py); }
+  .sw.bu { background: var(--bu-fill); border: 1.5px solid var(--bu-stroke); }
+  .panel-label { font-size: 12px; color: var(--ink-muted); margin: 0; font-weight: 600; letter-spacing: .02em; }
+  #main-chart, #var-chart { width: 100%; }
+  #var-chart { margin-top: 4px; }
+  svg { overflow: visible; }
+  details { margin-top: 28px; color: var(--ink-muted); }
+  summary { cursor: pointer; }
+  table { border-collapse: collapse; margin-top: 10px; width: 100%; font-variant-numeric: tabular-nums; color: var(--ink); }
+  th, td { padding: 4px 8px; text-align: right; border-bottom: 1px solid var(--rule); }
+  th:first-child, td:first-child { text-align: left; }
+  .error { color: var(--neg); }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Loading…</h1>
+  <p class="subtitle" id="subtitle"></p>
+
+  <div class="legend" aria-hidden="true">
+    <span><i class="sw ac"></i>AC Actual 2026</span>
+    <span><i class="sw py"></i>PY Prior year 2025</span>
+    <span><i class="sw bu"></i>BU Budget 2026</span>
+  </div>
+  <p class="panel-label">Revenue, KES m</p>
+  <div id="main-chart"></div>
+  <p class="panel-label">ΔBU Actual vs budget, KES m</p>
+  <div id="var-chart"></div>
+
+  <details>
+    <summary>Data table</summary>
+    <table id="table"></table>
+  </details>
+</main>
+
+<script>
+const fmt = d3.format(".1f");
+const fmtSigned = d3.format("+.1f");
+const monthLabel = d3.utcFormat("%b");
+
+function tokens() {
+  const s = getComputedStyle(document.documentElement);
+  const v = (n) => s.getPropertyValue(n).trim();
+  return {
+    ink: v("--ink"), muted: v("--ink-muted"), rule: v("--rule"), bg: v("--bg"),
+    ac: v("--ac"), py: v("--py"), buStroke: v("--bu-stroke"), buFill: v("--bu-fill"),
+    pos: v("--pos"), neg: v("--neg")
+  };
+}
+
+function headline(data) {
+  const sum = (k) => d3.sum(data, (d) => d[k]);
+  const ac = sum("actual"), bu = sum("budget"), py = sum("prior_year");
+  const varBu = ac - bu;
+  const misses = data.filter((d) => d.variance < 0).map((d) => d.label);
+  const verb = varBu >= 0 ? "beat" : "missed";
+  const missText = misses.length
+    ? ` despite ${misses.length === 1 ? "a shortfall" : "shortfalls"} in ${misses.join(" and ")}`
+    : "";
+  return {
+    title: `2026 revenue ${verb} budget by KES ${fmt(Math.abs(varBu))}m (${fmtSigned(varBu / bu * 100)}%)${missText}`,
+    subtitle: `Full-year actual KES ${d3.format(",.1f")(ac)}m vs budget KES ${d3.format(",.1f")(bu)}m; ` +
+      `${fmtSigned((ac - py) / py * 100)}% on prior year. Kenyan SACCO, monthly revenue, KES millions.`
+  };
+}
+
+function render(data) {
+  const t = tokens();
+  const el = document.getElementById("main-chart");
+  const width = Math.max(320, el.clientWidth);
+  const margin = { left: 8, right: 8 };
+  const padding = 0.2;
+  const step = (width - margin.left - margin.right) / data.length;
+  const band = step * (1 - padding);
+  // IBCS overlap: PY offset left, BU outline offset right, AC solid in front
+  const colW = band * 0.58;
+  const inset = (band - colW) / 2;
+  const offset = Math.min(band * 0.2, 10);
+  const domain = data.map((d) => d.label);
+  const yMax = d3.max(data, (d) => Math.max(d.actual, d.budget, d.prior_year)) * 1.12;
+
+  const xOpts = { domain, padding, label: null, tickSize: 0 };
+  const style = { background: "transparent", color: t.ink, fontSize: "11px", overflow: "visible" };
+
+  const main = Plot.plot({
+    width, height: 280,
+    marginLeft: margin.left, marginRight: margin.right, marginTop: 18, marginBottom: 24,
+    style,
+    x: { ...xOpts, axis: "bottom" },
+    y: { domain: [0, yMax], axis: null },
+    marks: [
+      Plot.barY(data, { x: "label", y: "prior_year", fill: t.py, insetLeft: inset, insetRight: inset, dx: -offset }),
+      Plot.barY(data, { x: "label", y: "budget", fill: t.buFill, stroke: t.buStroke, strokeWidth: 1.5,
+        insetLeft: inset, insetRight: inset, dx: offset }),
+      Plot.barY(data, { x: "label", y: "actual", fill: t.ac, insetLeft: inset, insetRight: inset }),
+      Plot.ruleY([0], { stroke: t.ink, strokeWidth: 1 }),
+      Plot.text(data, { x: "label", y: (d) => Math.max(d.actual, d.budget, d.prior_year), text: (d) => fmt(d.actual),
+        dy: -7, fill: t.ink, fontSize: width < 560 ? 9 : 11, fontWeight: 600 }),
+      Plot.tip(data, Plot.pointerX({
+        x: "label", y: (d) => Math.max(d.actual, d.budget, d.prior_year),
+        title: (d) => `${d.label} 2026\nActual  ${fmt(d.actual)}\nBudget  ${fmt(d.budget)}\nPrior yr  ${fmt(d.prior_year)}\nΔBU  ${fmtSigned(d.variance)}  ·  ΔPY  ${fmtSigned(d.actual - d.prior_year)}`,
+        fill: t.bg, stroke: t.rule, textColor: t.ink
+      }))
+    ]
+  });
+
+  const vExt = d3.max(data, (d) => Math.abs(d.variance)) * 1.35;
+  const variance = Plot.plot({
+    width, height: 150,
+    marginLeft: margin.left, marginRight: margin.right, marginTop: 16, marginBottom: 16,
+    style,
+    x: { ...xOpts, axis: null },
+    y: { domain: [-vExt, vExt], axis: null },
+    marks: [
+      Plot.barY(data, { x: "label", y: "variance", fill: (d) => d.variance >= 0 ? t.pos : t.neg,
+        insetLeft: inset, insetRight: inset }),
+      Plot.ruleY([0], { stroke: t.ink, strokeWidth: 1 }),
+      Plot.text(data.filter((d) => d.variance >= 0), { x: "label", y: "variance", text: (d) => fmtSigned(d.variance),
+        dy: -4, lineAnchor: "bottom", fill: t.ink, fontSize: width < 560 ? 9 : 11, fontWeight: 600 }),
+      Plot.text(data.filter((d) => d.variance < 0), { x: "label", y: "variance", text: (d) => fmtSigned(d.variance),
+        dy: 4, lineAnchor: "top", fill: t.ink, fontSize: width < 560 ? 9 : 11, fontWeight: 600 }),
+      Plot.tip(data, Plot.pointerX({
+        x: "label", y: "variance",
+        title: (d) => `${d.label} 2026\nActual − budget  ${fmtSigned(d.variance)} KES m (${fmtSigned(d.variance / d.budget * 100)}%)`,
+        fill: t.bg, stroke: t.rule, textColor: t.ink
+      }))
+    ]
+  });
+
+  el.replaceChildren(main);
+  document.getElementById("var-chart").replaceChildren(variance);
+}
+
+function renderTable(data) {
+  const rows = data.map((d) => `<tr><td>${d.label}</td><td>${fmt(d.actual)}</td><td>${fmt(d.budget)}</td>` +
+    `<td>${fmt(d.prior_year)}</td><td>${fmtSigned(d.variance)}</td></tr>`).join("");
+  document.getElementById("table").innerHTML =
+    `<thead><tr><th>Month</th><th>Actual</th><th>Budget</th><th>Prior year</th><th>ΔBU</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+d3.csv("data/revenue.csv", (d) => {
+  const date = d3.utcParse("%Y-%m")(d.month);
+  const actual = +d.actual, budget = +d.budget;
+  return { month: d.month, date, label: monthLabel(date), actual, budget, prior_year: +d.prior_year, variance: actual - budget };
+}).then((data) => {
+  data.sort((a, b) => a.date - b.date);
+  const h = headline(data);
+  document.getElementById("title").textContent = h.title;
+  document.getElementById("subtitle").textContent = h.subtitle;
+  document.title = "SACCO Revenue 2026";
+  renderTable(data);
+  render(data);
+
+  let raf;
+  const rerender = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => render(data)); };
+  new ResizeObserver(rerender).observe(document.getElementById("main-chart"));
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rerender);
+}).catch((err) => {
+  const title = document.getElementById("title");
+  title.textContent = "Could not load data/revenue.csv";
+  title.className = "error";
+  document.getElementById("subtitle").textContent =
+    "Browsers block fetch() from file:// pages. Serve the folder, e.g. `python -m http.server`, then open http://localhost:8000. (" + err.message + ")";
+});
+</script>
+</body>
+</html>
