@@ -81,11 +81,11 @@
   <div class="legend" aria-hidden="true">
     <span><i class="sw ac"></i>AC Actual 2026</span>
     <span><i class="sw py"></i>PY Prior year 2025</span>
-    <span><i class="sw bu"></i>BU Budget 2026</span>
+    <span><i class="sw bu"></i>PL Budget 2026</span>
   </div>
   <p class="panel-label">Revenue, KES m</p>
   <div id="main-chart"></div>
-  <p class="panel-label">ΔBU Actual vs budget, KES m</p>
+  <p class="panel-label">ΔPL Actual vs budget, KES m</p>
   <div id="var-chart"></div>
 
   <details>
@@ -133,7 +133,7 @@ function render(data) {
   const padding = 0.2;
   const step = (width - margin.left - margin.right) / data.length;
   const band = step * (1 - padding);
-  // IBCS overlap: PY offset left, BU outline offset right, AC solid in front
+  // IBCS overlap: PY offset left, PL outline offset right, AC solid in front
   const colW = band * 0.58;
   const inset = (band - colW) / 2;
   const offset = Math.min(band * 0.2, 10);
