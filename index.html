@@ -159,7 +159,7 @@ function render(data) {
         dy: -7, fill: t.ink, fontSize: width < 560 ? 9 : 11, fontWeight: 600 }),
       Plot.tip(data, Plot.pointerX({
         x: "label", y: (d) => Math.max(d.actual, d.budget, d.prior_year),
-        title: (d) => `${d.label} 2026\nActual  ${fmt(d.actual)}\nBudget  ${fmt(d.budget)}\nPrior yr  ${fmt(d.prior_year)}\nΔBU  ${fmtSigned(d.variance)}  ·  ΔPY  ${fmtSigned(d.actual - d.prior_year)}`,
+        title: (d) => `${d.label} 2026\nActual  ${fmt(d.actual)}\nBudget  ${fmt(d.budget)}\nPrior yr  ${fmt(d.prior_year)}\nΔPL  ${fmtSigned(d.variance)}  ·  ΔPY  ${fmtSigned(d.actual - d.prior_year)}`,
         fill: t.bg, stroke: t.rule, textColor: t.ink
       }))
     ]
@@ -196,7 +196,7 @@ function renderTable(data) {
   const rows = data.map((d) => `<tr><td>${d.label}</td><td>${fmt(d.actual)}</td><td>${fmt(d.budget)}</td>` +
     `<td>${fmt(d.prior_year)}</td><td>${fmtSigned(d.variance)}</td></tr>`).join("");
   document.getElementById("table").innerHTML =
-    `<thead><tr><th>Month</th><th>Actual</th><th>Budget</th><th>Prior year</th><th>ΔBU</th></tr></thead><tbody>${rows}</tbody>`;
+    `<thead><tr><th>Month</th><th>Actual</th><th>Budget</th><th>Prior year</th><th>ΔPL</th></tr></thead><tbody>${rows}</tbody>`;
 }
 
 d3.csv("data/revenue.csv", (d) => {
